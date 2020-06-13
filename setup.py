@@ -9,13 +9,21 @@ setup(
     author_email="rgemulla@uni-mannheim.de",
     packages=["kge"],
     install_requires=[
-        "torch>=1.5",
+        "torch==1.4.0",
         "pyyaml",
         "pandas",
         "argparse",
         "path",
         # please check correct behaviour when updating ax platform version!!
         "ax-platform==0.1.10",
+        # ------------------------------------------------------------------
+        # botorch and gpytorch are dependencies of ax-platform but are 
+        # currently fixed to versions that only require torch 1.4.0, 
+        # once issue on our side is resolved these configurations should 
+        # be removed 
+        "botorch==0.2.2",
+        "gpytorch==1.0.1",
+        # ------------------------------------------------------------------
         "sqlalchemy",
         "torchviz",
         "dataclasses",
