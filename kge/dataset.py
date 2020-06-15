@@ -1,20 +1,22 @@
 from __future__ import annotations
 
-import inspect
+import csv
 import os
-import pickle
+import sys
 import uuid
-from multiprocessing import Lock
-from typing import Dict, List, Any, Callable, Union, Optional
 
-import numpy as np
 import torch
 from torch import Tensor
+import numpy as np
+import pickle
+import inspect
 
-import kge.indexing
 from kge import Config, Configurable
+import kge.indexing
 from kge.indexing import create_default_index_functions
 from kge.misc import kge_base_dir
+
+from typing import Dict, List, Any, Callable, Union, Optional
 
 
 class Dataset(Configurable):
@@ -28,8 +30,6 @@ class Dataset(Configurable):
 
     #: whether to about when an outdated cached dataset or index file is found
     _abort_when_cache_outdated = False
-
-    lock = Lock()
 
     def __init__(self, config, folder=None):
         """Constructor for internal use.
@@ -209,45 +209,44 @@ class Dataset(Configurable):
         ignore_duplicates=False,
         use_pickle=False,
     ) -> Union[List, Dict]:
-        with Dataset.lock:
-            if use_pickle:
-                # check if there is a pickled, up-to-date version of the file
-                pickle_suffix = Dataset._to_valid_filename(
-                    f"-{as_list}-{delimiter}-{ignore_duplicates}.pckl"
-                )
-                pickle_filename = filename + pickle_suffix
-                result = Dataset._pickle_load_if_uptodate(None, pickle_filename, filename)
-                if result is not None:
-                    return result
+        if use_pickle:
+            # check if there is a pickled, up-to-date version of the file
+            pickle_suffix = Dataset._to_valid_filename(
+                f"-{as_list}-{delimiter}-{ignore_duplicates}.pckl"
+            )
+            pickle_filename = filename + pickle_suffix
+            result = Dataset._pickle_load_if_uptodate(None, pickle_filename, filename)
+            if result is not None:
+                return result
 
-            n = 0
-            dictionary = {}
-            warned_overrides = False
-            duplicates = 0
-            with open(filename, "r") as file:
-                for line in file:
-                    key, value = line.split(delimiter, maxsplit=1)
-                    value = value.rstrip("\n")
-                    if as_list:
-                        key = int(key)
-                        n = max(n, key + 1)
-                    if key in dictionary:
-                        duplicates += 1
-                        if not ignore_duplicates:
-                            raise KeyError(f"{filename} contains duplicated keys")
-                    else:
-                        dictionary[key] = value
-            if as_list:
-                array = [None] * n
-                for index, value in dictionary.items():
-                    array[index] = value
-                result = (array, duplicates)
-            else:
-                result = (dictionary, duplicates)
+        n = 0
+        dictionary = {}
+        warned_overrides = False
+        duplicates = 0
+        with open(filename, "r") as file:
+            for line in file:
+                key, value = line.split(delimiter, maxsplit=1)
+                value = value.rstrip("\n")
+                if as_list:
+                    key = int(key)
+                    n = max(n, key + 1)
+                if key in dictionary:
+                    duplicates += 1
+                    if not ignore_duplicates:
+                        raise KeyError(f"{filename} contains duplicated keys")
+                else:
+                    dictionary[key] = value
+        if as_list:
+            array = [None] * n
+            for index, value in dictionary.items():
+                array[index] = value
+            result = (array, duplicates)
+        else:
+            result = (dictionary, duplicates)
 
-            if use_pickle:
-                Dataset._pickle_dump_atomic(result, pickle_filename)
-            return result
+        if use_pickle:
+            Dataset._pickle_dump_atomic(result, pickle_filename)
+        return result
 
     def load_map(
         self,
